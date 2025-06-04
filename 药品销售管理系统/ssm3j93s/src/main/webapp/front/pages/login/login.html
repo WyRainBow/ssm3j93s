@@ -126,6 +126,11 @@
                 <label v-if="false" :style='{"padding":"0 10px","boxShadow":"0 0 6px rgba(255,0,0,0)","borderColor":"rgba(0,0,0,0)","backgroundColor":"transparent","color":"#333","borderRadius":"0","textAlign":"right","borderWidth":"0","width":"84px","fontSize":"16px","borderStyle":"solid"}' class="form-label">密码</label>
 				<input :style='{"padding":"0 10px","boxShadow":"0 0 6px rgba(0,0,0,.5)","borderColor":"rgba(0, 112, 126, 1)","backgroundColor":"#fff","color":"#333","borderRadius":"8px","textAlign":"left","borderWidth":"1px","width":"100%","fontSize":"14px","borderStyle":"solid","height":"44px"}' type="password" name="password" required lay-verify="required" placeholder="请输入密码" autocomplete="off" class="layui-input">
             </div>
+
+            <div :style='{"padding":"0","boxShadow":"0 0 6px rgba(255,0,0,0)","margin":"10px auto","borderColor":"rgba(0,0,0,0)","backgroundColor":"transparent","borderRadius":"0","borderWidth":"0","width":"80%","borderStyle":"solid","height":"auto"}' class="form-item">
+                <input type="checkbox" name="rememberMe" id="rememberMe" lay-skin="primary" title="记住我">
+            </div>
+
 				<div class="form-item codes" :style='{"padding":"0","boxShadow":"0 0 6px rgba(255,0,0,0)","margin":"0 auto","borderColor":"rgba(0, 112, 126, 1)","backgroundColor":"rgba(213, 195, 195, 0.49)","borderRadius":"20px","borderWidth":"0 0 0px 0","width":"80%","borderStyle":"solid","height":"64px"}'>
 				  <input style="flex: 1;" type="text" id="code" placeholder="请输入验证码">
 				  <div class="nums" id="nums" style="display: flex;justify-content: center;align-items: center;">
@@ -240,52 +245,82 @@
 		
 		randomString();
 
+            // --- BEGIN REMEMBER ME PAGE LOAD LOGIC ---
+            var rememberedUsername = localStorage.getItem('login_rememberedUsername');
+            var rememberedPassword = localStorage.getItem('login_rememberedPassword'); // Retrieve password
+            var rememberMeFlag = localStorage.getItem('login_rememberMeFlag');
+
+            if (rememberMeFlag === 'true' && rememberedUsername) {
+                jquery('input[name="username"]').val(rememberedUsername);
+                if (rememberedPassword) { // Only fill password if it was saved
+                     jquery('input[name="password"]').val(rememberedPassword);
+                }
+                jquery('#rememberMe').prop('checked', true);
+            }
+            // It's important to re-render the form elements if using a UI library like LayUI
+            form.render('checkbox');
+            // --- END REMEMBER ME PAGE LOAD LOGIC ---
+
             // 登录
             form.on('submit(login)', function(data) {
-		
+                var fieldData = data.field; // Get form fields
 
-                data = data.field;
-                if (!data.role) {
+                if (!fieldData.role) {
                     layer.msg('请选择登录用户类型', {
                         time: 2000,
                         icon: 5
                     });
                     return false;
                 }
-		if(false) {
-			var arr = []
-			for(var i = 0;i<codes.length;i++) {
-				arr.push(codes[i].num)
-			}
-			if(arr.join('').toLowerCase() != jquery('#code').val().toLowerCase()) {
-				alert("请输入正确的验证码");
-				randomString()
-				
-				return false;
-			}
-		}
-                http.request(data.role + '/login', 'get', data, function(res) {
+
+                //验证码校验逻辑 (currently if(false))
+                if (false) { // Keep existing logic for captcha if it's ever enabled
+                    var arr = [];
+                    for (var i = 0; i < codes.length; i++) {
+                        arr.push(codes[i].num);
+                    }
+                    if (arr.join('').toLowerCase() != jquery('#code').val().toLowerCase()) {
+                        alert("请输入正确的验证码");
+                        randomString();
+                        return false;
+                    }
+                }
+
+                http.request(fieldData.role + '/login', 'get', fieldData, function(res) {
+                    // --- BEGIN REMEMBER ME SAVE/CLEAR LOGIC ---
+                    if (jquery('#rememberMe').is(':checked')) {
+                        localStorage.setItem('login_rememberedUsername', fieldData.username);
+                        localStorage.setItem('login_rememberedPassword', fieldData.password); // Save password
+                        localStorage.setItem('login_rememberMeFlag', 'true');
+                    } else {
+                        localStorage.removeItem('login_rememberedUsername');
+                        localStorage.removeItem('login_rememberedPassword');
+                        localStorage.removeItem('login_rememberMeFlag');
+                    }
+                    // --- END REMEMBER ME SAVE/CLEAR LOGIC ---
+
                     layer.msg('登录成功', {
-                        time: 2000,
+                        time: 2000, // Adjusted time for consistency
                         icon: 6
                     });
                     // 登录凭证
                     localStorage.setItem('Token', res.token);
                     localStorage.setItem('role', jquery('#role:checked').attr('title'));
                     // 当前登录用户角色
-                    localStorage.setItem('userTable', data.role);
-                    localStorage.setItem('sessionTable', data.role);
+                    localStorage.setItem('userTable', fieldData.role);
+                    localStorage.setItem('sessionTable', fieldData.role);
                     // 用户名称
-                    localStorage.setItem('adminName', data.username);
-                    http.request(data.role + '/session', 'get', {}, function(res) {
+                    localStorage.setItem('adminName', fieldData.username); // Changed from data.username to fieldData.username
+
+                    http.request(fieldData.role + '/session', 'get', {}, function(sessionRes) {
                         // 用户id
-                        localStorage.setItem('userid', res.data.id);
+                        localStorage.setItem('userid', sessionRes.data.id);
                         // 路径访问设置
                         window.location.href = '../../index.html';
-                    })
-                    
+                    });
+
                 });
-                return false
+                return false; // Prevent default form submission
             });
 
         });
